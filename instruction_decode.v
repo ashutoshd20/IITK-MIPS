@@ -1,3 +1,6 @@
+//Author --  Ashutosh Dwivedi (200214)
+
+`timescale 1ns / 1ps
 module instruction_decode (
     input [31:0] instruction,
     output [5:0] opcode,

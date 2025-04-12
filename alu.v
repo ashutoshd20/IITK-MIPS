@@ -1,3 +1,6 @@
+//Author --  Ashutosh Dwivedi (200214)
+
+`timescale 1ns / 1ps
 module alu (
     input  [31:0] A,         // First operand (e.g., rs)
     input  [31:0] B,         // Second operand (e.g., rt or immediate)
