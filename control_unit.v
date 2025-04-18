@@ -1,6 +1,3 @@
-//Author --  Ashutosh Dwivedi (200214)
-
-`timescale 1ns / 1ps
 module control_unit (
     input [5:0] opcode,
     input [5:0] funct,

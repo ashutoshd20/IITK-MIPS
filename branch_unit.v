@@ -1,6 +1,3 @@
-//Author --  Ashutosh Dwivedi (200214)
-
-`timescale 1ns / 1ps
 module branch_unit (
     input [31:0] pc_current,
     input [31:0] rs_val,

@@ -1,6 +1,3 @@
-//Author --  Ashutosh Dwivedi (200214)
-
-`timescale 1ns / 1ps
 module instruction_fetch (
     input clk,
     input reset,
@@ -8,10 +5,6 @@ module instruction_fetch (
     input write_enable,
     input [11:0] init_address,
     input [31:0] init_instruction,
-
-    input [31:0] next_pc,
-    input branch_taken,
-
     output reg [31:0] pc,
     output [31:0] instruction
 );
@@ -28,11 +21,7 @@ module instruction_fetch (
     always @(posedge clk or posedge reset) begin
         if (reset)
             pc <= 32'h00400000;
-        else if (!init_mode) begin
-            if (branch_taken)
-                pc <= next_pc;
-            else
-                pc <= pc + 4;
-        end
+        else if (!init_mode)
+            pc <= pc + 4;
     end
 endmodule

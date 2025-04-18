@@ -1,6 +1,3 @@
-//Author --  Ashutosh Dwivedi (200214)
-
-`timescale 1ns / 1ps
 module iitk_mini_mips (
     input clk,
     input reset,
@@ -24,17 +21,12 @@ module iitk_mini_mips (
     wire [31:0] reg_rs_val, reg_rt_val, alu_result;
     wire [63:0] hi_lo;
     wire [31:0] next_pc;
-    wire take_branch;
-    wire branch_taken;
 
     wire regDst, aluSrc, memToReg, regWrite;
     wire memRead, memWrite;
     wire branch, jump, is_jal, is_jr;
     wire [2:0] branchType;
     wire [31:0] mem_out;
-
-    // Branch signal
-    assign branch_taken = branch && take_branch;
 
     // Instruction Fetch
     instruction_fetch IF (
@@ -44,8 +36,6 @@ module iitk_mini_mips (
         .write_enable(write_enable),
         .init_address(init_address),
         .init_instruction(init_instruction),
-        .next_pc(next_pc),
-        .branch_taken(branch_taken),
         .pc(pc),
         .instruction(instruction)
     );
@@ -107,11 +97,13 @@ module iitk_mini_mips (
         .is_jump(jump),
         .is_jal(is_jal),
         .is_jr(is_jr),
-        .next_pc(next_pc),
-        .take_branch(take_branch)
+        .next_pc(next_pc)
     );
 
+    // Output hooks
     assign pc_out = pc;
     assign instruction_out = instruction;
     assign debug_result = alu_result;
+
 endmodule
+

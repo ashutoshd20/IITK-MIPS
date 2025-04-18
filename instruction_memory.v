@@ -1,6 +1,3 @@
-//Author --  Ashutosh Dwivedi (200214)
-
-`timescale 1ns / 1ps
 module instruction_memory (
     input clk,
     input init_mode,                         // 1 = load via interface, 0 = run mode

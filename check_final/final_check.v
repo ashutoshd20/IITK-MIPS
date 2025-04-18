@@ -13,11 +13,6 @@ module instruction_memory (
         if (init_mode && write_enable)
             memory[init_address] <= init_instruction;
     end
-  
-//   	always @(posedge clk) begin
-//         if (init_mode && write_enable)
-//             $display("Loaded IMEM[%0d] = %h", init_address, init_instruction);
-//     	end
 
     assign instruction = memory[(address - 32'h00400000) >> 2];
 endmodule
@@ -36,6 +31,10 @@ module instruction_fetch (
     input write_enable,
     input [11:0] init_address,
     input [31:0] init_instruction,
+
+    input [31:0] next_pc,
+    input branch_taken,
+
     output reg [31:0] pc,
     output [31:0] instruction
 );
@@ -52,8 +51,12 @@ module instruction_fetch (
     always @(posedge clk or posedge reset) begin
         if (reset)
             pc <= 32'h00400000;
-        else if (!init_mode)
-            pc <= pc + 4;
+        else if (!init_mode) begin
+            if (branch_taken)
+                pc <= next_pc;
+            else
+                pc <= pc + 4;
+        end
     end
 endmodule
 
@@ -90,6 +93,7 @@ endmodule
 
 
 
+
 `timescale 1ns / 1ps
 module data_memory (
     input clk,
@@ -108,10 +112,12 @@ module data_memory (
             memory[word_addr] <= writeData;
     end
 
-    always @(memRead or word_addr or memory[word_addr]) begin
+    always @(*) begin
         readData = memRead ? memory[word_addr] : 32'b0;
     end
 endmodule
+
+
 
 
 
@@ -150,7 +156,6 @@ module control_unit (
                     6'b000010: aluOp = 5'b01101; // srl
                     6'b000011: aluOp = 5'b01110; // sra
                     6'b101010: aluOp = 5'b10000; // slt
-                    6'b011000: aluOp = 5'b00100; // mul
                     6'b001000: begin              // jr
                         regWrite = 0;
                         is_jr = 1;
@@ -190,6 +195,7 @@ module control_unit (
         endcase
     end
 endmodule
+
 
 
 
@@ -239,6 +245,7 @@ module branch_unit (
         end
     end
 endmodule
+
 
 
 
@@ -330,6 +337,7 @@ endmodule
 
 
 
+`timescale 1ns / 1ps
 module regfile (
     input clk,
     input [4:0] rs,
@@ -367,6 +375,7 @@ endmodule
 
 
 
+
 `timescale 1ns / 1ps
 module iitk_mini_mips (
     input clk,
@@ -391,12 +400,17 @@ module iitk_mini_mips (
     wire [31:0] reg_rs_val, reg_rt_val, alu_result;
     wire [63:0] hi_lo;
     wire [31:0] next_pc;
+    wire take_branch;
+    wire branch_taken;
 
     wire regDst, aluSrc, memToReg, regWrite;
     wire memRead, memWrite;
     wire branch, jump, is_jal, is_jr;
     wire [2:0] branchType;
     wire [31:0] mem_out;
+
+    // Branch signal
+    assign branch_taken = branch && take_branch;
 
     // Instruction Fetch
     instruction_fetch IF (
@@ -406,6 +420,8 @@ module iitk_mini_mips (
         .write_enable(write_enable),
         .init_address(init_address),
         .init_instruction(init_instruction),
+        .next_pc(next_pc),
+        .branch_taken(branch_taken),
         .pc(pc),
         .instruction(instruction)
     );
@@ -467,12 +483,11 @@ module iitk_mini_mips (
         .is_jump(jump),
         .is_jal(is_jal),
         .is_jr(is_jr),
-        .next_pc(next_pc)
+        .next_pc(next_pc),
+        .take_branch(take_branch)
     );
 
-    // Output hooks
     assign pc_out = pc;
     assign instruction_out = instruction;
     assign debug_result = alu_result;
-
 endmodule

@@ -1,6 +1,3 @@
-//Author --  Ashutosh Dwivedi (200214)
-
-`timescale 1ns / 1ps
 module data_memory (
     input clk,
     input memRead,
@@ -19,6 +16,9 @@ module data_memory (
     end
 
     always @(*) begin
-        readData = memRead ? memory[word_addr] : 32'b0;
+        if (memRead)
+            readData = memory[word_addr];
+        else
+            readData = 32'b0;
     end
 endmodule
