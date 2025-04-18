@@ -1,60 +1,30 @@
+// Code your design here
+`timescale 1ns / 1ps
 `timescale 1ns / 1ps
 module instruction_memory (
     input clk,
-    input init_mode,                         // 1 = load via interface, 0 = run mode
-    input [11:0] init_address,               // Address for writing during init
-    input [31:0] init_instruction,           // Instruction to write
-    input write_enable,                      
-    input [31:0] address,                    // Address during execution
+    input reset,
+    input init_mode,
+    input [11:0] init_address,
+    input [31:0] init_instruction,
+    input write_enable,
+    input [31:0] address,
     output [31:0] instruction
 );
     reg [31:0] memory [0:4095];
+    integer i;
+
     always @(posedge clk) begin
-        if (init_mode && write_enable)
+        if (reset) begin
+            for (i = 0; i < 4096; i = i + 1)
+                memory[i] <= 32'b0;
+        end
+        else if (init_mode && write_enable) begin
             memory[init_address] <= init_instruction;
+        end
     end
-  
-//   	always @(posedge clk) begin
-//         if (init_mode && write_enable)
-//             $display("Loaded IMEM[%0d] = %h", init_address, init_instruction);
-//     	end
 
     assign instruction = memory[(address - 32'h00400000) >> 2];
-endmodule
-
-
-
-
-
-
-
-`timescale 1ns / 1ps
-module instruction_fetch (
-    input clk,
-    input reset,
-    input init_mode,
-    input write_enable,
-    input [11:0] init_address,
-    input [31:0] init_instruction,
-    output reg [31:0] pc,
-    output [31:0] instruction
-);
-    instruction_memory imem (
-        .clk(clk),
-        .init_mode(init_mode),
-        .init_address(init_address),
-        .init_instruction(init_instruction),
-        .write_enable(write_enable),
-        .address(pc),
-        .instruction(instruction)
-    );
-
-    always @(posedge clk or posedge reset) begin
-        if (reset)
-            pc <= 32'h00400000;
-        else if (!init_mode)
-            pc <= pc + 4;
-    end
 endmodule
 
 
@@ -208,9 +178,11 @@ module branch_unit (
     input is_jump,
     input is_jal,
     input is_jr,
+    input branch,                // ✅ Gating signal
     output reg [31:0] next_pc,
     output reg take_branch
 );
+
     wire signed [31:0] rs_signed = rs_val;
     wire signed [31:0] rt_signed = rt_val;
     wire [31:0] offset = {{14{immediate[15]}}, immediate, 2'b00}; // sign-extend + shift
@@ -219,18 +191,20 @@ module branch_unit (
         take_branch = 0;
         next_pc = pc_current + 4;
 
-        case (branch_control)
-            3'b000: take_branch = (rs_val == rt_val);     // beq
-            3'b001: take_branch = (rs_val != rt_val);     // bne
-            3'b010: take_branch = (rs_signed > rt_signed);// bgt
-            3'b011: take_branch = (rs_signed >= rt_signed);// bgte
-            3'b100: take_branch = (rs_signed < rt_signed);// ble
-            3'b101: take_branch = (rs_signed <= rt_signed);// bleq
-            3'b110: take_branch = (rs_val < rt_val);      // bleu
-            3'b111: take_branch = (rs_val > rt_val);      // bgtu
-        endcase
+        if (branch) begin
+            case (branch_control)
+                3'b000: take_branch = (rs_val == rt_val);     // beq
+                3'b001: take_branch = (rs_val != rt_val);     // bne
+                3'b010: take_branch = (rs_signed > rt_signed);// bgt
+                3'b011: take_branch = (rs_signed >= rt_signed);// bgte
+                3'b100: take_branch = (rs_signed < rt_signed);// ble
+                3'b101: take_branch = (rs_signed <= rt_signed);// bleq
+                3'b110: take_branch = (rs_val < rt_val);      // bleu
+                3'b111: take_branch = (rs_val > rt_val);      // bgtu
+            endcase
+        end
 
-        if (take_branch) begin
+        if (take_branch && branch) begin
             next_pc = pc_current + 4 + offset;
         end else if (is_jump) begin
             next_pc = {pc_current[31:28], jump_address, 2'b00}; // j / jal
@@ -239,6 +213,7 @@ module branch_unit (
         end
     end
 endmodule
+
 
 
 
@@ -382,7 +357,9 @@ module iitk_mini_mips (
     output [31:0] instruction_out,
     output [31:0] debug_result
 );
-    wire [31:0] pc, instruction;
+    // Internal Wires
+    reg [31:0] pc;
+    wire [31:0] instruction;
     wire [5:0] opcode, funct;
     wire [4:0] rs, rt, rd, shamt;
     wire [15:0] imm;
@@ -391,22 +368,30 @@ module iitk_mini_mips (
     wire [31:0] reg_rs_val, reg_rt_val, alu_result;
     wire [63:0] hi_lo;
     wire [31:0] next_pc;
-
     wire regDst, aluSrc, memToReg, regWrite;
     wire memRead, memWrite;
     wire branch, jump, is_jal, is_jr;
     wire [2:0] branchType;
     wire [31:0] mem_out;
+    wire take_branch;
 
-    // Instruction Fetch
-    instruction_fetch IF (
+    // PC Update Logic
+    always @(posedge clk or posedge reset) begin
+        if (reset)
+            pc <= 32'h00400000;
+        else if (!init_mode)
+            pc <= take_branch ? next_pc : pc + 4;
+    end
+
+    // Instruction Memory (standalone now)
+    instruction_memory imem (
         .clk(clk),
-        .reset(reset),
+        .reset(reset), 
         .init_mode(init_mode),
-        .write_enable(write_enable),
         .init_address(init_address),
         .init_instruction(init_instruction),
-        .pc(pc),
+        .write_enable(write_enable),
+        .address(pc),
         .instruction(instruction)
     );
 
@@ -467,10 +452,12 @@ module iitk_mini_mips (
         .is_jump(jump),
         .is_jal(is_jal),
         .is_jr(is_jr),
-        .next_pc(next_pc)
+        .branch(branch),            
+        .next_pc(next_pc),
+        .take_branch(take_branch)
     );
 
-    // Output hooks
+    // Outputs
     assign pc_out = pc;
     assign instruction_out = instruction;
     assign debug_result = alu_result;
