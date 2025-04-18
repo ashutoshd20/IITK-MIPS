@@ -1,5 +1,5 @@
 // Code your design here
-`timescale 1ns / 1ps
+
 `timescale 1ns / 1ps
 module instruction_memory (
     input clk,
@@ -103,7 +103,7 @@ module control_unit (
         regDst = 0; aluSrc = 0; memToReg = 0; regWrite = 0;
         memRead = 0; memWrite = 0; branch = 0; jump = 0;
         is_jal = 0; is_jr = 0; aluOp = 0; branchType = 3'b000;
-
+		
         case (opcode)
             6'b000000: begin // R-type
                 regDst = 1;
@@ -178,14 +178,16 @@ module branch_unit (
     input is_jump,
     input is_jal,
     input is_jr,
-    input branch,                // ✅ Gating signal
+    input branch,                
     output reg [31:0] next_pc,
     output reg take_branch
 );
 
     wire signed [31:0] rs_signed = rs_val;
     wire signed [31:0] rt_signed = rt_val;
-    wire [31:0] offset = {{14{immediate[15]}}, immediate, 2'b00}; // sign-extend + shift
+  	wire signed [9:0] branch_offset = immediate[15:6];  // upper 10 bits
+	wire signed [31:0] offset = {{22{branch_offset[9]}}, branch_offset} << 2;
+
 
     always @(*) begin
         take_branch = 0;
